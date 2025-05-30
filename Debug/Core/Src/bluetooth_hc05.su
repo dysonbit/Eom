@@ -1,0 +1,5 @@
+../Core/Src/bluetooth_hc05.c:18:19:hc05_init	8	static
+../Core/Src/bluetooth_hc05.c:31:6:hc05_is_data_received	4	static
+../Core/Src/bluetooth_hc05.c:38:10:hc05_get_received_data	24	static
+../Core/Src/bluetooth_hc05.c:83:19:hc05_transmit_data	16	static
+../Core/Src/bluetooth_hc05.c:96:6:hc05_uart_rx_callback_handler	16	static

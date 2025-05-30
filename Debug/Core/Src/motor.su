@@ -1,0 +1,9 @@
+../Core/Src/motor.c:15:6:Motor_Init	8	static
+../Core/Src/motor.c:33:6:Motor_SetSpeed	32	static
+../Core/Src/motor.c:106:6:Motor_Stop	16	static
+../Core/Src/motor.c:115:6:Car_Move	16	static
+../Core/Src/motor.c:124:6:Car_TurnLeft	16	static
+../Core/Src/motor.c:132:6:Car_TurnRight	16	static
+../Core/Src/motor.c:142:6:Car_Forward	16	static
+../Core/Src/motor.c:151:6:Car_Backward	16	static
+../Core/Src/motor.c:158:6:Car_Stop	8	static

@@ -1,0 +1,4 @@
+../Core/Src/bluetooth_hc05_at.c:14:19:hc05_reconfigure_uart_baudrate	16	static
+../Core/Src/bluetooth_hc05_at.c:23:6:hc05_enter_at_mode_hardware_reset	8	static
+../Core/Src/bluetooth_hc05_at.c:46:6:hc05_exit_at_mode_hardware_reset	8	static
+../Core/Src/bluetooth_hc05_at.c:58:6:hc05_send_at_command	40	static

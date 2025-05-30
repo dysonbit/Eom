@@ -1,0 +1,6 @@
+../Core/Src/MPU6500.c:14:15:mpu6500_read_word	40	static
+../Core/Src/MPU6500.c:34:8:mpu6500_read_accel_raw	48	static
+../Core/Src/MPU6500.c:56:8:mpu6500_read_gyro_raw	48	static
+../Core/Src/MPU6500.c:75:6:mpu6500_write_byte	40	static
+../Core/Src/MPU6500.c:92:9:mpu6500_read_byte	40	static
+../Core/Src/MPU6500.c:112:6:mpu6500_init	16	static
