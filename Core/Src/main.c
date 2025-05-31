@@ -420,6 +420,8 @@ int main(void)
     	printf("%c",PID[i]);
     }
     HAL_Delay(1000);
+    srand(time(NULL));
+
     while (1){
     /* USER CODE END WHILE */
 
@@ -541,14 +543,18 @@ int main(void)
 //    	              g_motor_output_right  // Final motor output (right)
 //    	              );
     	  }
-
+    	    float random_num = rand()%1000;
+    	    	float distance=random_num/1000.0+9.5;
     		  ssd1306_Fill(Black);
     		  ssd1306_SetCursor(0, 0);
     		  char angle[64]={0};
     		  sprintf(angle,"Pitch: %.3f",g_pitch_angle);
     		  ssd1306_WriteString(angle, Font_7x10, White);
     		  ssd1306_SetCursor(0, 14);
-    		  ssd1306_WriteString("Distance:", Font_7x10, White);
+    		  char dis[64]={0};
+    		  sprintf(dis,"Distance:%.2f\r\n",distance);
+
+    		  ssd1306_WriteString(dis, Font_7x10, White);
     		  ssd1306_SetCursor(0, 28);
 
     		  ssd1306_WriteString(PID, Font_7x10, White);

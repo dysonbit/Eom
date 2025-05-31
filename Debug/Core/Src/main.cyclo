@@ -2,6 +2,6 @@
 ../Core/Src/main.c:117:6:calibrate_mpu6500_bias	5
 ../Core/Src/main.c:183:6:configure_hc05_via_at	3
 ../Core/Src/main.c:272:5:main	15
-../Core/Src/main.c:567:6:SystemClock_Config	3
-../Core/Src/main.c:615:6:HAL_UART_RxCpltCallback	1
-../Core/Src/main.c:629:6:Error_Handler	1
+../Core/Src/main.c:573:6:SystemClock_Config	3
+../Core/Src/main.c:621:6:HAL_UART_RxCpltCallback	1
+../Core/Src/main.c:635:6:Error_Handler	1
