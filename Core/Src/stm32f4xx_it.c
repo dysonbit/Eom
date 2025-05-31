@@ -120,7 +120,7 @@ int32_t g_encoder_delta_right = 0;       // 右轮编码器计数差值 (每控�
 
 volatile float g_left_wheel_speed_rps = 0.0f;     // 左轮速度 (转/秒)
 volatile float g_right_wheel_speed_rps = 0.0f;    // 右轮速度 (转/秒)
-float g_robot_linear_speed_mps = 0.0f;   // 小车直线速度 (米/秒)
+volatile float g_robot_linear_speed_mps = 0.0f;   // 小车直线速度 (米/秒)
 volatile float g_robot_angular_speed_dps = 0.0f;  // 小车角速度 (度/秒)
 
 // 新增：速度环PID参数和变量
@@ -129,9 +129,15 @@ volatile float g_speed_kp = 3469.0f;      // 速度环比例系数 (需要调试
 volatile float g_speed_ki = 300.f;     // 速度环积分系数 (需要调试)
 volatile float g_speed_kd = 0.7f;     // 速度环微分系数 (需要调试)
 
+
 // 速度环PID的静态变量，用于积分和微分项
 static float g_speed_integral_error = 0.0f; // 速度积分误差累积
 static float g_speed_prev_linear_speed_mps = 0.0f; // 上一次的直线速度，用于计算微分
+
+volatile bool g_main_loop_motor_override = false;
+
+volatile float left_right = 3.0f;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -516,19 +522,33 @@ void TIM5_IRQHandler(void)
 	    g_motor_output_left = 0;
 	    g_motor_output_right = 0;
 	    // TODO: Add other safety actions like an alarm or state change
-	} else {
+	}
+	// 将 "=" 改为 "=="
+	// 同时，为了浮点数比较的健壮性，使用 fabs 和 FLOAT_ZERO_THRESHOLD
+	else if (fabs(left_right - 1.0f) < FLOAT_ZERO_THRESHOLD) { // 检查是否是左转指令
+	    g_motor_output_left = motor_speed;
+	    g_motor_output_right = 0;
+	}
+	else if (fabs(left_right - 2.0f) < FLOAT_ZERO_THRESHOLD) { // 检查是否是右转指令
+		g_motor_output_left = 0;
+	    g_motor_output_right = motor_speed;
+
+	}
+	else {
 	    // If within safe angle, apply the calculated motor speed
 	    g_motor_output_left = motor_speed;
 	    g_motor_output_right = motor_speed;
 	}
 
 	// Apply Motor Speed using the Motor module functions
-	Car_Move(g_motor_output_left, g_motor_output_right);
+	    Car_Move(g_motor_output_left, g_motor_output_right);
+
 
 	// --- PID control calculation and Motor application END ---
 
   /* USER CODE END TIM5_IRQn 1 */
 }
+
 /**
   * @brief This function handles USART6 global interrupt.
   */
@@ -546,384 +566,3 @@ void USART6_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-//
-//
-///* USER CODE BEGIN Header */
-///**
-//  ******************************************************************************
-//  * @file    stm32f4xx_it.c
-//  * @brief   Interrupt Service Routines.
-//  ******************************************************************************
-//  * @attention
-//  *
-//  * Copyright (c) 2025 STMicroelectronics.
-//  * All rights reserved.
-//  *
-//  * This software is licensed under terms that can be found in the LICENSE file
-//  * in the root directory of this software component.
-//  * If no LICENSE file comes with this software, it is provided AS-IS.
-//  *
-//  ******************************************************************************
-//  */
-///* USER CODE END Header */
-//
-///* Includes ------------------------------------------------------------------*/
-//#include "main.h"
-//#include "stm32f4xx_it.h"
-///* Private includes ----------------------------------------------------------*/
-///* USER CODE BEGIN Includes */
-///* USER CODE END Includes */
-//
-///* Private typedef -----------------------------------------------------------*/
-///* USER CODE BEGIN TD */
-//
-///* USER CODE END TD */
-//
-///* Private define ------------------------------------------------------------*/
-///* USER CODE BEGIN PD */
-//
-///* USER CODE END PD */
-//
-///* Private macro -------------------------------------------------------------*/
-///* USER CODE BEGIN PM */
-//
-///* USER CODE END PM */
-//
-///* Private variables ---------------------------------------------------------*/
-///* USER CODE BEGIN PV */
-////float g_pitch_angle = 0.0f;         // 当前 Pitch 角 (度)
-////float g_accel_angle = 0.0f;         // 加速度计计算出的 Pitch 角 (度)
-////float g_gyro_y_dps = 0.0f;          // Y轴角速度 (度/秒) - 假设 Y 轴对应 Pitch 方向旋转
-////float g_target_pitch_angle = 0.0f;  // 目标平衡角 (度), 通常是 0
-////
-////// PID 参数 (这些值需要根据实际调试来确定!)
-////// 平衡环 (PD 控制器)
-//volatile float g_balance_kp = 8.0f;  // 比例系数
-//volatile float g_balance_kd = 0.0f;   // 微分系数
-//
-//// 互补滤波参数
-//// COMPLEMENTARY_FILTER_KP 越大，陀螺仪权重越高，响应快但易受漂移
-//// COMPLEMENTARY_FILTER_KP 越小，加速度计权重越高，稳定但易受振动干扰
-////#define COMPLEMENTARY_FILTER_KP 0.98f // 陀螺仪权重 (建议 0.95 - 0.998)
-////#define CONTROL_LOOP_PERIOD_S (0.01f) // 控制周期，与 TIM5 中断频率对应 (100Hz -> 0.01s)
-//
-////// 电机输出值 (这里存储最终的 PWM 值或者速度百分比)
-////int16_t g_motor_output_left = 0;
-////int16_t g_motor_output_right = 0;
-//
-//// Raw sensor data from MPU6500
-//volatile int16_t g_accel_x_raw, g_accel_y_raw, g_accel_z_raw;
-//volatile int16_t g_gyro_x_raw, g_gyro_y_raw, g_gyro_z_raw;
-//
-//// Sensor Bias values (calculated during initialization calibration)
-//volatile int16_t g_gyro_x_bias_raw = 0;
-//volatile int16_t g_gyro_y_bias_raw = 0;
-//volatile int16_t g_gyro_z_bias_raw = 0;
-//volatile float g_accel_pitch_bias_deg = 0.0f; // Bias for accelerometer calculated pitch angle
-//
-//// Processed sensor data and estimated angle
-//volatile float g_pitch_angle = 0.0f;         // 当前 Pitch 角 (度) - 融合后
-//volatile float g_accel_angle = 0.0f;         // 加速度计计算出的 Pitch 角 (度)
-//volatile float g_gyro_x_dps = 0.0f;          // X轴角速度 (度/秒) - 假设 X 轴对应 Pitch
-//volatile float g_gyro_y_dps = 0.0f;          // Y轴角速度 (度/秒) - 假设 Y 轴对应 Roll
-//volatile float g_gyro_z_dps = 0.0f;          // Z轴角速度 (度/秒) - 假设 Z 轴对应 Yaw
-//
-//volatile float g_target_pitch_angle = 0.0f;  // 目标平衡角 (度), 通常是 0
-//
-//// PID 参数 (这些值需要根据实际调试来确定!)
-//// 平衡环 (PD 控制器)
-////volatile float g_balance_kp = 0.2025f;  // 比例系数
-////volatile float g_balance_kd = 0.01f;   // 微分系数
-//// volatile float g_balance_ki = 0.0f; // 积分系数 (暂不使用)
-//
-//// 互补滤波参数
-//const float COMPLEMENTARY_FILTER_KP = 0.98f; // 陀螺仪权重 (建议 0.95 - 0.998)
-//const float CONTROL_LOOP_PERIOD_S = (0.01f); // 控制周期，与 TIM5 中断频率对应 (100Hz -> 0.01s)
-//
-//// 电机输出值 (这里存储最终的速度百分比 -100到100)
-//volatile int16_t g_motor_output_left = 0;
-//volatile int16_t g_motor_output_right = 0;
-//
-///* USER CODE END PV */
-//
-///* Private function prototypes -----------------------------------------------*/
-///* USER CODE BEGIN PFP */
-//
-///* USER CODE END PFP */
-//
-///* Private user code ---------------------------------------------------------*/
-///* USER CODE BEGIN 0 */
-//
-///* USER CODE END 0 */
-//
-///* External variables --------------------------------------------------------*/
-//extern TIM_HandleTypeDef htim5;
-//extern UART_HandleTypeDef huart6;
-///* USER CODE BEGIN EV */
-//
-///* USER CODE END EV */
-//
-///******************************************************************************/
-///*           Cortex-M4 Processor Interruption and Exception Handlers          */
-///******************************************************************************/
-///**
-//  * @brief This function handles Non maskable interrupt.
-//  */
-//void NMI_Handler(void)
-//{
-//  /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-//
-//  /* USER CODE END NonMaskableInt_IRQn 0 */
-//  /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-//   while (1)
-//  {
-//  }
-//  /* USER CODE END NonMaskableInt_IRQn 1 */
-//}
-//
-///**
-//  * @brief This function handles Hard fault interrupt.
-//  */
-//void HardFault_Handler(void)
-//{
-//  /* USER CODE BEGIN HardFault_IRQn 0 */
-//
-//  /* USER CODE END HardFault_IRQn 0 */
-//  while (1)
-//  {
-//    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
-//    /* USER CODE END W1_HardFault_IRQn 0 */
-//  }
-//}
-//
-///**
-//  * @brief This function handles Memory management fault.
-//  */
-//void MemManage_Handler(void)
-//{
-//  /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-//
-//  /* USER CODE END MemoryManagement_IRQn 0 */
-//  while (1)
-//  {
-//    /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
-//    /* USER CODE END W1_MemoryManagement_IRQn 0 */
-//  }
-//}
-//
-///**
-//  * @brief This function handles Pre-fetch fault, memory access fault.
-//  */
-//void BusFault_Handler(void)
-//{
-//  /* USER CODE BEGIN BusFault_IRQn 0 */
-//
-//  /* USER CODE END BusFault_IRQn 0 */
-//  while (1)
-//  {
-//    /* USER CODE BEGIN W1_BusFault_IRQn 0 */
-//    /* USER CODE END W1_BusFault_IRQn 0 */
-//  }
-//}
-//
-///**
-//  * @brief This function handles Undefined instruction or illegal state.
-//  */
-//void UsageFault_Handler(void)
-//{
-//  /* USER CODE BEGIN UsageFault_IRQn 0 */
-//
-//  /* USER CODE END UsageFault_IRQn 0 */
-//  while (1)
-//  {
-//    /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
-//    /* USER CODE END W1_UsageFault_IRQn 0 */
-//  }
-//}
-//
-///**
-//  * @brief This function handles System service call via SWI instruction.
-//  */
-//void SVC_Handler(void)
-//{
-//  /* USER CODE BEGIN SVCall_IRQn 0 */
-//
-//  /* USER CODE END SVCall_IRQn 0 */
-//  /* USER CODE BEGIN SVCall_IRQn 1 */
-//
-//  /* USER CODE END SVCall_IRQn 1 */
-//}
-//
-///**
-//  * @brief This function handles Debug monitor.
-//  */
-//void DebugMon_Handler(void)
-//{
-//  /* USER CODE BEGIN DebugMonitor_IRQn 0 */
-//
-//  /* USER CODE END DebugMonitor_IRQn 0 */
-//  /* USER CODE BEGIN DebugMonitor_IRQn 1 */
-//
-//  /* USER CODE END DebugMonitor_IRQn 1 */
-//}
-//
-///**
-//  * @brief This function handles Pendable request for system service.
-//  */
-//void PendSV_Handler(void)
-//{
-//  /* USER CODE BEGIN PendSV_IRQn 0 */
-//
-//  /* USER CODE END PendSV_IRQn 0 */
-//  /* USER CODE BEGIN PendSV_IRQn 1 */
-//
-//  /* USER CODE END PendSV_IRQn 1 */
-//}
-//
-///**
-//  * @brief This function handles System tick timer.
-//  */
-//void SysTick_Handler(void)
-//{
-//  /* USER CODE BEGIN SysTick_IRQn 0 */
-//
-//  /* USER CODE END SysTick_IRQn 0 */
-//  HAL_IncTick();
-//  /* USER CODE BEGIN SysTick_IRQn 1 */
-//
-//  /* USER CODE END SysTick_IRQn 1 */
-//}
-//
-///******************************************************************************/
-///* STM32F4xx Peripheral Interrupt Handlers                                    */
-///* Add here the Interrupt Handlers for the used peripherals.                  */
-///* For the available peripheral interrupt handler names,                      */
-///* please refer to the startup file (startup_stm32f4xx.s).                    */
-///******************************************************************************/
-//
-///**
-//  * @brief This function handles TIM5 global interrupt.
-//  */
-//void TIM5_IRQHandler(void)
-//{
-//  /* USER CODE BEGIN TIM5_IRQn 0 */
-//
-//  /* USER CODE END TIM5_IRQn 0 */
-//  HAL_TIM_IRQHandler(&htim5);
-//  /* USER CODE BEGIN TIM5_IRQn 1 */
-//	// Read raw sensor data from MPU6500
-//	// These variables are declared as volatile in stm32f4xx_it.c
-//	mpu6500_read_accel_raw(&g_accel_x_raw, &g_accel_y_raw, &g_accel_z_raw);
-//	mpu6500_read_gyro_raw(&g_gyro_x_raw, &g_gyro_y_raw, &g_gyro_z_raw);
-//
-//	// Apply bias correction to Gyro raw data
-//	// Accel bias will be applied to the calculated angle later
-//	int16_t gyro_x_corrected_raw = g_gyro_x_raw - g_gyro_x_bias_raw;
-//	int16_t gyro_y_corrected_raw = g_gyro_y_raw - g_gyro_y_bias_raw; // Correct all axes bias
-//	int16_t gyro_z_corrected_raw = g_gyro_z_raw - g_gyro_z_bias_raw; // Correct all axes bias
-//
-//	// 1.5. Convert bias-corrected Gyro data and raw Accel data to physical units
-//	float accel_x_g = (float)g_accel_x_raw / ACCEL_SENSITIVITY_2G; // Convert to g (use raw for accel angle calculation)
-//	float accel_y_g = (float)g_accel_y_raw / ACCEL_SENSITIVITY_2G; // Convert to g
-//	float accel_z_g = (float)g_accel_z_raw / ACCEL_SENSITIVITY_2G; // Convert to g
-//
-//	// Assuming X axis gyro is Pitch rate (deg/s) based on your confirmation
-//	g_gyro_x_dps = (float)gyro_x_corrected_raw / GYRO_SENSITIVITY_2000DPS; // Pitch    (deg/s)
-//	g_gyro_y_dps = (float)gyro_y_corrected_raw / GYRO_SENSITIVITY_2000DPS; // Roll rate (deg/s)
-//	g_gyro_z_dps = (float)gyro_z_corrected_raw / GYRO_SENSITIVITY_2000DPS; // Yaw rate (deg/s)
-//
-//
-//	// 3. Calculate accelerometer angle (Pitch)
-//	// Use Accel X and Z as confirmed for Pitch angle calculation
-//	// atan2f(y, x) calculates angle of vector (x, y) relative to positive x-axis.
-//	// If X is forward/backward, Z is up/down, then angle relative to Z axis (vertical) in X-Z plane
-//	// is atan2(Accel X, Accel Z).
-//	// Check for accel_z_g close to zero to avoid potential issues, though unlikely in vertical calibration.
-//	// atan2f handles denominator being zero if numerator is non-zero.
-//	if (accel_z_g == 0.0f) accel_z_g = 0.001f; // Prevent true 0 denominator, although atan2f handles it
-//
-//	g_accel_angle = atan2f(accel_x_g, accel_z_g) * (180.0f / M_PI); // Calculate angle based on Accel X and Z
-//	g_accel_angle -= g_accel_pitch_bias_deg; // Apply accelerometer pitch angle bias from calibration
-//
-//	// 4. Sensor fusion (Complementary Filter)
-//	// CONTROL_LOOP_PERIOD_S is the TIM5 interrupt period (0.01 seconds for 100Hz)
-//	// Formula: estimated_angle = alpha * (previous_estimated_angle + gyro_rate * dt) + (1 - alpha) * accel_angle
-//	// alpha is COMPLEMENTARY_FILTER_KP
-//	g_pitch_angle = COMPLEMENTARY_FILTER_KP * (g_pitch_angle + g_gyro_x_dps * CONTROL_LOOP_PERIOD_S) + (1.0f - COMPLEMENTARY_FILTER_KP) * g_accel_angle;
-//
-//	// 5. PID Control Calculation
-//	// PID inputs: Pitch error (current angle - target angle) and Pitch rate (g_gyro_x_dps)
-//
-//	float pitch_error = g_target_pitch_angle - g_pitch_angle; // Angle error for P and I terms
-//
-//	// PD Control Output: control = Kp * error + Kd * derivative
-//	// We use the corrected gyro pitch rate (g_gyro_x_dps) directly as the derivative term
-//	float control_output = g_balance_kp * pitch_error + g_balance_kd * g_gyro_x_dps;
-//
-//	// TODO: If using Integral term later:
-//	// static float integral_error = 0; // Needs to be static to accumulate
-//	// float max_integral_error = ...; // Define a limit to prevent integral windup
-//	// integral_error += pitch_error * CONTROL_LOOP_PERIOD_S;
-//	// // Clamp integral error to prevent windup
-//	// if (integral_error > max_integral_error) integral_error = max_integral_error;
-//	// if (integral_error < -max_integral_error) integral_error = -max_integral_error;
-//	// control_output += g_balance_ki * integral_error;
-//
-//
-//	// 6. Map Control Output to Motor Speed Percentage and Apply Limits
-//	// The control_output value needs to be scaled and limited to a motor speed range, e.g., -100 to 100.
-//	// The scaling factor depends heavily on your PID tuning. A simple approach is to directly use control_output,
-//	// assuming your Kp/Kd tuning results in a reasonable output range.
-//	int16_t motor_speed = (int16_t)control_output; // Directly use control output as speed
-//
-//	// Apply motor speed limits (-100 to 100 percent)
-//	if (motor_speed > 100) motor_speed = 100;
-//	if (motor_speed < -100) motor_speed = -100;
-//
-//	// 7. Basic Safety Check: Stop motor if tilt angle exceeds a safe threshold
-//	float safety_angle_threshold = 30.0f; // Degrees (adjust as needed, e.g., 30 degrees)
-//
-//	if (fabs(g_pitch_angle) > safety_angle_threshold) {
-//	    // Stop motors if the robot is falling
-//	    g_motor_output_left = 0;
-//	    g_motor_output_right = 0;
-//	    // TODO: Add other safety actions like an alarm or state change
-//	} else {
-//	    // If within safe angle, apply the calculated motor speed
-//	    // For self-balancing, typically left and right motors receive the same command
-//	    g_motor_output_left = motor_speed;
-//	    g_motor_output_right = motor_speed;
-//	}
-//
-//
-//	// 8. Apply Motor Speed using the Motor module functions
-//	// Note: Motor_SetSpeed takes speed percentage (-100 to 100)
-//	// This function should handle direction and PWM setting based on the sign and magnitude
-//	Car_Move(g_motor_output_left, g_motor_output_right);
-////	Car_Move(4, 4);
-//
-//	// --- PID control calculation and Motor application END ---
-//
-//
-//  /* USER CODE END TIM5_IRQn 1 */
-//}
-//
-///**
-//  * @brief This function handles USART6 global interrupt.
-//  */
-//void USART6_IRQHandler(void)
-//{
-//  /* USER CODE BEGIN USART6_IRQn 0 */
-//
-//  /* USER CODE END USART6_IRQn 0 */
-//  HAL_UART_IRQHandler(&huart6);
-//  /* USER CODE BEGIN USART6_IRQn 1 */
-//
-//  /* USER CODE END USART6_IRQn 1 */
-//}
-//
-///* USER CODE BEGIN 1 */
-//
-///* USER CODE END 1 */
-//
-//

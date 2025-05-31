@@ -45,6 +45,13 @@
 /* USER CODE BEGIN PD */
 #define HC05_DATA_MODE_BAUDRATE 9600 // 定义HC-05在数据模式下的波特率 (必须与AT指令配置的一致)
 
+extern volatile bool g_main_loop_motor_override; // 新增
+
+// 定义前进脉冲的速度和持续时间
+//#define FORWARD_PULSE_SPEED_PERCENTAGE  20 // 电机转动的速度百分比 (0-100)
+//#define FORWARD_PULSE_DURATION_MS       80 // 每次前进持续时间 (毫秒)
+//#define STOP_AND_ADJUST_DURATION_MS     500 // 停下调整持续时间 (毫秒)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -307,20 +314,22 @@ int main(void)
   // 启动编码器模式
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL); // 启动电机1编码器
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL); // 启动电机2编码器
-
+  int hc05=0;
     if (hc05_init() != HAL_OK) {
         printf("BT failed");
+        hc05=-1;
         // 初始化失败处理
         Error_Handler();
     }
     // ... hc05_init() OK ...
+
     const char* test_msg = "Hello from STM32!\r\n";
     if (hc05_transmit_data((uint8_t*)test_msg, strlen(test_msg)) == HAL_OK) {
         printf("Test message sent to Bluetooth.\r\n");
+
     } else {
         printf("Failed to send test message to Bluetooth.\r\n");
     }
-    HAL_Delay(5000);
 //  // 初始化OLED (使用 hi2c1)
   if (ssd1306_Init(&hi2c1) != 0 ){
       printf("OLED SSD1306 initialization failed!\r\n");
@@ -348,7 +357,6 @@ int main(void)
   ssd1306_SetCursor(0, 0);
   ssd1306_WriteString("OLED Init OK", Font_7x10, White);
   ssd1306_UpdateScreen(&hi2c1);
-  HAL_Delay(1000);
 //    configure_hc05_via_at();
 //    if (huart1.Init.BaudRate != HC05_DATA_MODE_BAUDRATE) {
 //        printf("Current STM32 UART1 baud: %lu. Reconfiguring to %d for HC-05 data mode.\r\n",
@@ -381,7 +389,6 @@ int main(void)
     // 初始化电机模块 (会启动 TIM1 PWM 通道)
     Motor_Init();
     printf("Motor module initialized.\r\n");
-    HAL_Delay(500);
 
     // 启动控制循环定时器 TIM5 的中断
     if (HAL_TIM_Base_Start_IT(&htim5) != HAL_OK) {
@@ -397,28 +404,80 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-      while (1)
-      {
+
+    typedef enum {
+        STATE_BALANCING_AT_ZERO,
+        STATE_MOVING_FORWARD_PULSE
+    } RobotMoveState;
+
+    static RobotMoveState current_move_state = STATE_BALANCING_AT_ZERO; // 初始状态为原地平衡
+    static uint32_t last_state_change_time = 0;
+    int instruction=0;
+    char PID[64]={0};
+    int len = sprintf(PID, "Kp:%.2f Kd:%.1f",
+                      g_balance_kp, g_balance_kd);
+    for(int i=0;i<len;i++){
+    	printf("%c",PID[i]);
+    }
+    HAL_Delay(1000);
+    while (1){
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+//    	  	 printf("test");
+
           if (hc05_is_data_received()) {
               printf("success");
               uint8_t received_buffer[BLUETOOTH_RX_BUFFER_SIZE];
               uint16_t len = hc05_get_received_data(received_buffer, BLUETOOTH_RX_BUFFER_SIZE);
               if (len > 0) {
-                  printf("BT:");
+//                  printf("BT:");
                   // 处理接收到的数据 received_buffer，长度为 len
                   // 例如，通过另一个 UART 打印出来，或者回传给蓝牙
-                  ssd1306_Fill(Black);
-                  ssd1306_SetCursor(0, 0);
-                  char* string=received_buffer;
-                  ssd1306_WriteString(string, Font_7x10, White);
-                  ssd1306_UpdateScreen(&hi2c1);
+
                   printf("BT Rcvd: %s\n", (char*)received_buffer);
-                  hc05_transmit_data(received_buffer, len); // 示例：回显数据
+                  instruction=(int)received_buffer[0]-48;
+                  for(int i=0;i<10;i++)
+                  {
+                	  printf("%c ",received_buffer[i]);
+                  }
+                  printf("\n");
               }
           }
+          if(instruction==1){
+        	                                left_right = 3.0f;
+                                      		g_target_linear_speed_mps = 0.02f;
+                                      	    HAL_Delay(100);
+                                      	    g_target_linear_speed_mps = 0.0f;
+                                      	    HAL_Delay(2000);
+                                        }else if(instruction==2){
+                                        	left_right = 3.0f;
+                                           	g_target_linear_speed_mps = -0.02f;
+                                           	HAL_Delay(100);
+                                           	g_target_linear_speed_mps = 0.0f;
+                                              HAL_Delay(2000);
+                                        }else if(instruction==3){
+                                        	left_right = 1.0f;
+                                           	g_target_linear_speed_mps = 0.01f;
+                                           	HAL_Delay(50);
+                                           	left_right = 3.0f;
+                                           	g_target_linear_speed_mps = 0.0f;
+                                              HAL_Delay(1500);
+                                        }else if(instruction==4){
+                                        	left_right = 2.0f;
+                                           	g_target_linear_speed_mps = 0.01f;
+                                           	HAL_Delay(50);
+                                           	left_right = 3.0f;
+                                           	g_target_linear_speed_mps = 0.0f;
+                                              HAL_Delay(1500);
+                                        }else{
+                                        	left_right = 3.0f;
+                                      	 	g_target_linear_speed_mps = 0.0f;
+                                      	    HAL_Delay(1000);
+                                        }
+
+
+//          printf("%d\n",instruction);
 
 
           // 主循环现在用于执行非实时的任务，例如：
@@ -430,97 +489,77 @@ int main(void)
     	  // mpu
     	  // Example: Print raw sensor data periodically for verification
 
+
+//    	    uint32_t current_time = HAL_GetTick();
+//    	    switch (current_move_state) {
+//    	        case STATE_BALANCING_AT_ZERO:
+//    	            // 确保目标速度是0，让速度环将小车停在原地
+//    	            g_target_linear_speed_mps = 0.0f;
+//
+//    	            if (current_time - last_state_change_time >= BALANCE_DURATION_MS) {
+//    	                // 达到原地平衡时间，切换到前进脉冲状态
+//    	                current_move_state = STATE_MOVING_FORWARD_PULSE;
+//    	                last_state_change_time = current_time;
+//    	                printf("--- Moving Forward Pulse Start ---\r\n");
+//    	            }
+//    	            break;
+
+//    	        case STATE_MOVING_FORWARD_PULSE:
+//    	            // 设置目标速度为非零值，让速度环驱动小车前进
+//    	            g_target_linear_speed_mps = PULSE_FORWARD_SPEED_MPS;
+//
+//    	            if (current_time - last_state_change_time >= PULSE_DURATION_MS) {
+//    	                // 达到前进脉冲时间，切换回原地平衡状态
+//    	                current_move_state = STATE_BALANCING_AT_ZERO;
+//    	                last_state_change_time = current_time;
+//    	                printf("--- Moving Forward Pulse End, Balancing at Zero ---\r\n");
+//    	            }
+//    	            break;
+
+
+
+    	    // 确保主循环不至于空转，可以加入一个短延时
+
+
+
+
+
     	      	  static uint32_t print_counter = 0;
     	  if (++print_counter % 100 == 0) { // Print approximately every 1 second (adjust frequency as needed)
     	       print_counter = 0;
 
 //    	        Calculate current pitch error for printing (error is calculated in the IRQ, but recalculate here for printing convenience)
     	       float current_pitch_error = g_target_pitch_angle - g_pitch_angle;
-
-    	       printf("FusedPitch: %.2f | AccelAng: %.2f | Gyro(corr): X=%.2f | Err: %.2f | CtrlOut: %.2f | Motor(LR): %d,%d\r\n",
-    	              g_pitch_angle,        // Fused pitch angle
-    	              g_accel_angle,        // Accel calculated pitch angle after bias correction
-    	              g_gyro_x_dps,         // Corrected Gyro Pitch rate (deg/s)
-    	              current_pitch_error,  // Pitch error
-    	              g_balance_kp * current_pitch_error + g_balance_kd * g_gyro_x_dps, // Recalculate Control Output for printing (simplified PD)
-    	              g_motor_output_left,  // Final motor output (left)
-    	              g_motor_output_right  // Final motor output (right)
-    	              );
-
-//    	  }
-
-
-
-//    	       static int16_t test_speed = 0;
-//    	       static uint32_t speed_test_delay = 2000; // 每隔2秒增加一次速度
 //
-//    	       // 移除或注释掉之前的周期性打印原始数据的代码，以免干扰
-//
-//    	       static uint32_t last_test_time = 0;
-//    	       if (HAL_GetTick() - last_test_time > speed_test_delay) {
-//    	           last_test_time = HAL_GetTick();
-//
-//    	           // 逐渐增加测试速度
-//    	           test_speed += 1; // 每次增加 1%
-//    	           if (test_speed > 20) test_speed = 0; // 例如，测试到 20% 就重置
-//
-//    	           printf("Testing speed: %d%%\r\n", test_speed);
-//
-//    	           Car_Move(test_speed, test_speed); // 测试正向速度
-//    	           // 你也可以测试负向速度 Car_Move(-test_speed, -test_speed);
-//    	       }
-
-
-//    	       	   	  Car_Forward(20); // 这行是活的
-//    	           	  HAL_Delay(2000); // Keep a small delay to prevent WDT issues or busy waiting
-//    	           	  Car_Backward(20); // 这行是活的
-//    	           	  HAL_Delay(2000);
-//    	           	  Car_TurnLeft(20); // 这行是活的
-//    	           	  HAL_Delay(2000);
-//    	           	  Car_TurnRight(20); // 这行是活的
-//    	           	  HAL_Delay(2000); // Keep a small delay to prevent WDT issues or busy waiting
-
-
-
-    	  // =======================================
-    	  // motor
-
-    	  // =======================================
-
-
-//          // 示例: 更新 OLED 显示当前姿态和电机输出
-//          static uint32_t oled_update_counter = 0;
-//          char oled_buffer[40]; // 确保 buffer 足够大
-
-//          // 降低 OLED 更新频率，例如每 50ms 更新一次 (TIM5 中断 10ms，计数 5 次)
-//          if (++oled_update_counter % 5 == 0) {
-//              oled_update_counter = 0; // 重置计数器
-//              ssd1306_Fill(Black); // 清空屏幕缓冲区
-//
-//              // 显示 Pitch 角
-//              ssd1306_SetCursor(0, 0); // 第一行
-//              snprintf(oled_buffer, sizeof(oled_buffer), "P:%.1f (A%.1f)", g_pitch_angle, g_accel_angle); // 显示滤波后和加速度计角度
-//              ssd1306_WriteString(oled_buffer, Font_7x10, White);
-//
-//              // 显示角速度
-//              ssd1306_SetCursor(0, 12); // 第二行
-//              snprintf(oled_buffer, sizeof(oled_buffer), "G:%.1f", g_gyro_y_dps);
-//              ssd1306_WriteString(oled_buffer, Font_7x10, White);
-//
-//              // 显示电机 PWM 输出 (百分比)
-//              ssd1306_SetCursor(0, 24); // 第三行
-//              snprintf(oled_buffer, sizeof(oled_buffer), "L:%d R:%d %%", g_motor_output_left, g_motor_output_right);
-//              ssd1306_WriteString(oled_buffer, Font_7x10, White);
-//
-//              ssd1306_UpdateScreen(&hi2c1); // 更新 OLED 显示
-//         	 }
-
-//          HAL_Delay(1); // 让主循环稍微延时一下，避免完全空转浪费资源
+//    	       printf("FusedPitch: %.2f | AccelAng: %.2f | Gyro(corr): X=%.2f | Err: %.2f | CtrlOut: %.2f | Motor(LR): %d,%d\r\n",
+//    	              g_pitch_angle,        // Fused pitch angle
+//    	              g_accel_angle,        // Accel calculated pitch angle after bias correction
+//    	              g_gyro_x_dps,         // Corrected Gyro Pitch rate (deg/s)
+//    	              current_pitch_error,  // Pitch error
+//    	              g_balance_kp * current_pitch_error + g_balance_kd * g_gyro_x_dps, // Recalculate Control Output for printing (simplified PD)
+//    	              g_motor_output_left,  // Final motor output (left)
+//    	              g_motor_output_right  // Final motor output (right)
+//    	              );
     	  }
-  /* USER CODE END 3 */
-      }
-}
 
+    		  ssd1306_Fill(Black);
+    		  ssd1306_SetCursor(0, 0);
+    		  char angle[64]={0};
+    		  sprintf(angle,"Pitch: %.3f",g_pitch_angle);
+    		  ssd1306_WriteString(angle, Font_7x10, White);
+    		  ssd1306_SetCursor(0, 14);
+    		  ssd1306_WriteString("Distance:", Font_7x10, White);
+    		  ssd1306_SetCursor(0, 28);
+
+    		  ssd1306_WriteString(PID, Font_7x10, White);
+    		  ssd1306_UpdateScreen(&hi2c1);
+    		   char msg[64]={0};
+    		   sprintf(msg,"Pitch:%f Accel:%f gyro:%f\r\n",g_pitch_angle,g_accel_angle,g_gyro_x_dps);
+    	      hc05_transmit_data((uint8_t*)msg, strlen(msg));
+
+  /* USER CODE END 3 */
+}
+}
 /**
   * @brief System Clock Configuration
   * @retval None

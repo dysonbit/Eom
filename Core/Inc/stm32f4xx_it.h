@@ -55,6 +55,7 @@ extern volatile float g_target_pitch_angle;
 // PID parameters - can be adjusted locally or remotely
 extern volatile float g_balance_kp;  // Proportional gain
 extern volatile float g_balance_kd;   // Derivative gain
+extern volatile float g_balance_ki;
 // extern volatile float g_balance_ki; // Integral gain (if used later)
 
 // Complementary filter constant
